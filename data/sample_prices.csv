@@ -1,0 +1,9 @@
+sku,title,price,url
+B0A1,Samsung Galaxy S24 5G (8GB RAM 256GB Onyx Black),"₹74,999",https://example.com/s24
+B0A2,Apple iPhone 15 (128 GB) - Black,"₹69,900",https://example.com/iphone15
+B0A3,OnePlus 12 (12GB RAM 256GB Flowy Emerald),"₹64,999",https://example.com/op12
+B0A4,Redmi Note 13 Pro 5G (8GB 256GB),"₹24,999",https://example.com/rn13
+B0A5,Google Pixel 8a (8GB 128GB Obsidian),"₹52,999",https://example.com/px8a
+B0A6,Realme Narzo 70 Pro 5G (8GB 128GB),"₹19,999",https://example.com/n70
+B0A7,Broken row with no price,,https://example.com/bad
+B0A8,Nothing Phone (2a) (8GB 128GB Black),"₹23,999",https://example.com/np2a

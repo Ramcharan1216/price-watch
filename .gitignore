@@ -1,7 +1,20 @@
+# secrets and local settings
 .env
+
+# Python
+.venv/
 __pycache__/
 *.pyc
-.venv/
-node_modules/
-pgdata/
+.pytest_cache/
+
+# generated data (re-create with the scripts in the README)
+data/synthetic/
+data/synthetic_long/
 data/raw/
+pgdata/
+
+# misc
+node_modules/
+*.zip
+.idea/
+.vscode/
