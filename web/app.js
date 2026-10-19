@@ -1,5 +1,5 @@
 const app = document.getElementById("app");
-const inr = n => "₹" + Math.round(n).toLocaleString("en-IN");
+const inr = n => "???" + Math.round(n).toLocaleString("en-IN");
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const COLORS = ["var(--c1)", "var(--c2)", "var(--c3)"], DASH = ["", "7 4", "2 4"];
 
@@ -14,13 +14,13 @@ async function api(path) {
 }
 
 /* ---------- search page ---------- */
-const PRICE_STEPS = [[15000, "Under ₹15,000"], [25000, "Under ₹25,000"], [40000, "Under ₹40,000"], [60000, "Under ₹60,000"]];
+const PRICE_STEPS = [[15000, "Under ???15,000"], [25000, "Under ???25,000"], [40000, "Under ???40,000"], [60000, "Under ???60,000"]];
 const itemHtml = (p, sub) => `<li><a class="item" href="#/product/${p.id}"><span class="nm">${esc(p.name)}<span class="sub">${sub}</span></span><span class="px">${inr(p.lowest_price ?? p.current)}</span></a></li>`;
 
 function viewSearch() {
   app.innerHTML = `<section class="hero"><h1>What are you buying?</h1>
     <p>See the price in every store, and how it has moved.</p>
-    <input id="q" type="search" placeholder="Try “galaxy s24” or “redmi note”" autocomplete="off" aria-label="Search phones">
+    <input id="q" type="search" placeholder="Try ???galaxy s24??? or ???redmi note???" autocomplete="off" aria-label="Search phones">
     <div class="filters"><select id="fb" aria-label="Brand"><option value="">All brands</option></select>
       <select id="fp" aria-label="Price"><option value="">Any price</option>${PRICE_STEPS.map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select>
       <select id="fs" aria-label="Sort"><option value="name">A to Z</option><option value="price_asc">Cheapest first</option><option value="price_desc">Most expensive first</option></select></div>
@@ -56,7 +56,7 @@ function viewSearch() {
     $("livebtn").addEventListener("click", () => runLive(text));
   }
   async function runLive(text) {
-    livebox.innerHTML = `<p class="msg">Asking the stores for live prices…</p>`;
+    livebox.innerHTML = `<p class="msg">Asking the stores for live prices???</p>`;
     try { const d = await api("/live-search?q=" + encodeURIComponent(text)); msg.textContent = ""; livebox.innerHTML = liveHtml(d); }
     catch (e) { livebox.innerHTML = `<p class="msg">${esc(e.message)}</p>`; }
   }
@@ -117,22 +117,22 @@ function drawChart(series, names) {
 }
 
 async function viewProduct(id) {
-  app.innerHTML = `<p class="msg">Loading…</p>`;
+  app.innerHTML = `<p class="msg">Loading???</p>`;
   let p, h, f, mv;
   try { [p, h, f, mv] = await Promise.all([api("/products/" + id), api("/products/" + id + "/history?days=90"),
     api("/products/" + id + "/forecast").catch(() => ({ available: false, reason: "The forecast is not available right now." })),
     api("/products/" + id + "/moves").catch(() => null)]); }
-  catch (e) { app.innerHTML = `<a class="back" href="#/">← Back to search</a><p class="msg">${esc(e.message)}</p>`; return; }
+  catch (e) { app.innerHTML = `<a class="back" href="#/">??? Back to search</a><p class="msg">${esc(e.message)}</p>`; return; }
   const prod = p.product, best = p.cheapest;
   const names = {}; p.offers.forEach(o => names[o.store] = o.store_name);
   const byStore = {};
   p.offers.forEach(o => (byStore[o.store] = byStore[o.store] || []).push(o));
   const rows = Object.values(byStore).map(l => ({ ...l[0], extra: l.length - 1 })).sort((a, b) => a.price - b.price);
-  const spec = [prod.ram_gb && prod.ram_gb + " GB RAM", prod.storage_gb && prod.storage_gb + " GB storage"].filter(Boolean).join(" · ");
-  app.innerHTML = `<a class="back" href="#/">← Back to search</a>
+  const spec = [prod.ram_gb && prod.ram_gb + " GB RAM", prod.storage_gb && prod.storage_gb + " GB storage"].filter(Boolean).join(" ?? ");
+  app.innerHTML = `<a class="back" href="#/">??? Back to search</a>
   <div class="top">
     <div class="tag"><h1>${esc(prod.brand)} ${esc(prod.model)}</h1><p class="spec">${esc(spec)}</p>
-      <div class="big">${best ? inr(best.price) : "—"}</div>
+      <div class="big">${best ? inr(best.price) : "???"}</div>
       <p class="where">${best ? "Cheapest now at " + esc(best.store_name) : "No prices yet"}</p>
       <p class="verdict">${esc(verdict(h))}</p></div>
     <div><h2>Prices today</h2><ul class="offers">${rows.map((o, i) => `<li class="offer ${i === 0 ? "best" : ""}">
@@ -159,7 +159,7 @@ async function viewProduct(id) {
       const i = Math.max(0, Math.min(hist.series.length - 1, Math.round((x - c.L) / (c.W - c.L - c.R) * (hist.series.length - 1))));
       const d = hist.series[i], gx = c.L + (hist.series.length < 2 ? 0 : i / (hist.series.length - 1)) * (c.W - c.L - c.R);
       guide.setAttribute("x1", gx); guide.setAttribute("x2", gx); guide.setAttribute("visibility", "visible");
-      out.textContent = d.date + ":  " + c.slugs.filter(s => d.by_store[s] != null).map(s => (names[s] || s) + " " + inr(d.by_store[s])).join("  ·  ");
+      out.textContent = d.date + ":  " + c.slugs.filter(s => d.by_store[s] != null).map(s => (names[s] || s) + " " + inr(d.by_store[s])).join("  ??  ");
     }
     svg.addEventListener("mousemove", move); svg.addEventListener("touchmove", move);
   }
@@ -199,9 +199,9 @@ function forecastHtml(f) {
 }
 
 async function viewAccuracy() {
-  app.innerHTML = `<p class="msg">Loading…</p>`;
+  app.innerHTML = `<p class="msg">Loading???</p>`;
   let r; try { r = await api("/accuracy"); } catch (e) { r = { available: false }; }
-  const back = `<a class="back" href="#/">← Back to search</a>`;
+  const back = `<a class="back" href="#/">??? Back to search</a>`;
   if (!r.available) { app.innerHTML = back + `<h2>How accurate are we?</h2><p class="msg">No accuracy report yet.</p>`; return; }
   const rep = r.report, ks = Object.keys(rep.horizons).sort((a, b) => a - b);
   const row = k => { const x = rep.horizons[k]; return `<li class="arow"><strong>${k} days</strong>
@@ -221,7 +221,8 @@ async function viewAccuracy() {
 
 
 /* ---------- why the price moved ---------- */
-const niceDate = iso => new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const niceDate = iso => { const [y, m, d] = iso.split("-").map(Number); return d + " " + MONTHS[m - 1] + " " + y; };
 function movesHtml(mv) {
   const head = `<section class="mvs"><h2>Why the price moved</h2>`;
   if (!mv) return head + `<p class="note">This is not available right now.</p></section>`;
@@ -230,7 +231,7 @@ function movesHtml(mv) {
     const up = m.direction === "up", when = m.kind === "gradual" ? niceDate(m.start) + " to " + niceDate(m.end) : niceDate(m.start);
     const why = m.reasons.length ? m.reasons.map(r => `<div class="why"><span class="chip c-${esc(r.confidence)}">${esc(r.label)}</span><span class="ev">${esc(r.evidence)}</span><span class="conf">${r.confidence === "strong" ? "Strong match" : r.confidence === "likely" ? "Likely" : "Possible"}</span></div>`).join("")
       : `<div class="why"><span class="chip c-none">No clear reason found</span></div>`;
-    return `<li class="mv"><div class="mh"><span class="mp ${up ? "up" : "down"}">${up ? "▲" : "▼"} ${Math.abs(m.change_pct).toFixed(1)}%</span>
+    return `<li class="mv"><div class="mh"><span class="mp ${up ? "up" : "down"}">${up ? "???" : "???"} ${Math.abs(m.change_pct).toFixed(1)}%</span>
       <span>${inr(m.start_price)} to ${inr(m.end_price)}<span class="sub">${m.kind === "gradual" ? "Gradual, " : ""}${esc(when)}</span></span></div>${why}</li>`;
   }).join("");
   return head + `<ul class="mlist">${items}</ul><p class="note">${esc(mv.note)}</p></section>`;
@@ -260,3 +261,4 @@ function route() {
 }
 window.addEventListener("hashchange", route);
 route();
+

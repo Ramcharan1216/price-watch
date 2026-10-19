@@ -10,8 +10,12 @@ live and tracked from that day.
 > so the numbers below show that the system works, not what real phones cost. Real sources
 > plug in through one adapter file (see [docs/live-search.md](docs/live-search.md)).
 
-<!-- Add screenshots here, for example:
-![Product page](docs/screenshots/product.png) -->
+## Screenshots
+![Product page with forecast](docs/screenshots/product.png)
+
+![Price history by store](docs/screenshots/history.png)
+
+![Why the price moved](docs/screenshots/reasons.png)
 
 ## What it does
 
@@ -43,12 +47,12 @@ Forecast, tested on the last 180 days with the model trained only on earlier dat
 |---|---|---|---|
 | 7 days | 1.12% | 1.50% | 88.7% |
 | 14 days | 1.18% | 1.66% | 87.1% |
-| 30 days | 2.09% | 2.19% | 85.7% |
+| 30 days | 2.15% | 2.19% | 86.3% |
 
 The forecast helps most when a sale starts or ends inside the period (about 4-5% miss against about
 8% for "no change"). In quiet periods it is no better than "no change". The sale calendar is a model
 input, as real sales are announced in advance, but the demo data was built with the same calendar,
-so real results will be less clean. At 30 days the gain over "no change" is small (about 0.1 points), and it rests on a rule set after seeing the test results: the 30-day model may only use its cautious settings, because the flexible ones lost to "no change" when the test period contained a cost shock they could not foresee. Reproduce this table with `python forecast/run_forecast.py --as-of 2026-10-16`.
+so real results will be less clean. At 30 days the gain over "no change" is small (0.04 to 0.1 points, depending on library versions), and it rests on a rule set after seeing the test results: the 30-day model may only use its cautious settings, because the flexible ones lost to "no change" when the test period contained a cost shock they could not foresee. Reproduce this table with `python forecast/run_forecast.py --as-of 2026-10-16`.
 
 Other checks: all 300 demo listings match the right product (an easy test, because the titles come in
 three fixed styles, so measure again on real listings); about 70% of detected price moves have an
@@ -119,4 +123,6 @@ python tests/test_live_api.py    # live endpoint behaviour
 
 CI with GitHub Actions, real market-signal feeds, a review screen for unverified matches,
 price-drop alerts, and a second product category.
+
+
 
