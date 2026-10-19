@@ -20,6 +20,11 @@ for pid in pids:
     if s:
         series[pid] = ([x["date"] for x in s], [x["lowest"] for x in s])
 
+asof = None
+if "--as-of" in sys.argv:        # python forecast/run_forecast.py --as-of 2026-10-17
+    asof = sys.argv[sys.argv.index("--as-of") + 1]
+    series = {pid: ([d for d in ds if d <= asof], ps[:sum(1 for d in ds if d <= asof)]) for pid, (ds, ps) in series.items()}
+    print(f"Using data up to {asof} only")
 panel = build_panel(series)
 if panel.empty:
     sys.exit(f"No product has enough history yet ({len(series)} products checked). Load longer history first.")

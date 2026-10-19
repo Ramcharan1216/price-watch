@@ -79,17 +79,24 @@ def _fit(df, h, params=0, quantiles=QUANTILES):
                                           random_state=0, **PARAM_SETS[params]).fit(X, y) for q in quantiles]
 
 
+# Longer horizons are more exposed to events the model cannot see (a cost shock, a policy
+# change), and in testing the flexible settings lost to "no change" there. So 30 days may
+# only use the cautious sets. This rule was set after seeing those results, so treat the
+# improvement as suggestive, not proven.
+ALLOWED = {7: (0, 1, 2), 14: (0, 1, 2), 30: (1, 2)}
+
+
 def _choose(df, h, val_days=180):
-    """Pick the settings with the smallest median error on the last `val_days` of df."""
+    """Pick the allowed settings with the smallest median error on the last `val_days` of df."""
+    allowed = ALLOWED.get(h, tuple(range(len(PARAM_SETS))))
     cut = df["date"].max() - pd.Timedelta(days=val_days)
     fit = df[df["date"] + pd.Timedelta(days=h) <= cut]
     val = df[df["date"] > cut]
     if len(fit) < 200 or len(val) < 50:
-        return 1
+        return allowed[-1]
     f, a = feats(h), np.exp(val[f"y{h}"].to_numpy())
-    errs = [float((np.abs(np.exp(_fit(fit, h, k, (0.5,))[0].predict(val[f])) - a) / a).mean())
-            for k in range(len(PARAM_SETS))]
-    return int(np.argmin(errs))
+    errs = {k: float((np.abs(np.exp(_fit(fit, h, k, (0.5,))[0].predict(val[f])) - a) / a).mean()) for k in allowed}
+    return min(errs, key=errs.get)
 
 
 def _predict(models, X):

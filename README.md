@@ -1,5 +1,7 @@
 # Price Watch
 
+![CI](https://github.com/Ramcharan1216/price-watch/actions/workflows/ci.yml/badge.svg)
+
 Search a phone, see its price in every store, how that price has moved, where it may go next,
 and the likely reason behind big moves. If a phone is not in the database, it can be looked up
 live and tracked from that day.
@@ -39,14 +41,14 @@ Forecast, tested on the last 180 days with the model trained only on earlier dat
 
 | Horizon | Typical miss | "No change" miss | Range held (aim 80%) |
 |---|---|---|---|
-| 7 days | 1.12% | 1.50% | 88.5% |
-| 14 days | 1.23% | 1.70% | 87.1% |
-| 30 days | 2.1% | 2.19% | 85.8% |
+| 7 days | 1.12% | 1.50% | 88.7% |
+| 14 days | 1.18% | 1.66% | 87.1% |
+| 30 days | 2.09% | 2.19% | 85.7% |
 
 The forecast helps most when a sale starts or ends inside the period (about 4-5% miss against about
 8% for "no change"). In quiet periods it is no better than "no change". The sale calendar is a model
 input, as real sales are announced in advance, but the demo data was built with the same calendar,
-so real results will be less clean.
+so real results will be less clean. At 30 days the gain over "no change" is small (about 0.1 points), and it rests on a rule set after seeing the test results: the 30-day model may only use its cautious settings, because the flexible ones lost to "no change" when the test period contained a cost shock they could not foresee. Reproduce this table with `python forecast/run_forecast.py --as-of 2026-10-16`.
 
 Other checks: all 300 demo listings match the right product (an easy test, because the titles come in
 three fixed styles, so measure again on real listings); about 70% of detected price moves have an
@@ -117,3 +119,4 @@ python tests/test_live_api.py    # live endpoint behaviour
 
 CI with GitHub Actions, real market-signal feeds, a review screen for unverified matches,
 price-drop alerts, and a second product category.
+

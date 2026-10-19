@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: priceintel
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: priceintel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U priceintel -d priceintel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://priceintel:ci_password@localhost:5432/priceintel
+      PGPASSWORD: ci_password
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Checks that need no database
+        run: |
+          python tests/test_parser.py
+          python tests/test_forecast.py
+          python tests/test_reasons.py
+          python tests/test_live_api.py
+          node --check web/app.js
+
+      - name: Create the database tables
+        run: |
+          psql -h localhost -U priceintel -d priceintel -f db/init/001_schema_nodocker.sql
+          python scripts/migrate.py
+
+      - name: Storage and live-search tests
+        run: |
+          python tests/test_loader.py
+          python tests/test_live.py
+
+      - name: Build the demo data, matching, forecast and reasons
+        run: |
+          python scripts/generate_synthetic_long.py
+          python ingestion/run_csv.py data/synthetic_long/prices_amazon_in.csv --store amazon_in --date-col date
+          python ingestion/run_csv.py data/synthetic_long/prices_flipkart.csv --store flipkart --date-col date
+          python ingestion/run_csv.py data/synthetic_long/prices_croma.csv --store croma --date-col date
+          python matching/run_matching.py
+          python matching/evaluate.py data/synthetic_long/ground_truth.csv
+          python scripts/load_signals.py
+          python forecast/run_forecast.py --as-of 2026-10-16
+          python reasons/run_reasons.py
+
+      - name: API tests
+        run: python tests/test_api.py
