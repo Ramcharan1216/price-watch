@@ -82,11 +82,11 @@ def load_observations(conn, store_id, run_id, observed_at, rows):
             continue
 
         conn.execute(
-            """INSERT INTO price_history (listing_id, observed_at, price_inr, in_stock, run_id)
-               VALUES (%s, %s, %s, %s, %s)
+            """INSERT INTO price_history (listing_id, observed_at, price_inr, in_stock, run_id, source)
+               VALUES (%s, %s, %s, %s, %s, %s)
                ON CONFLICT (listing_id, observed_at) DO UPDATE
-                 SET price_inr = EXCLUDED.price_inr, in_stock = EXCLUDED.in_stock""",
-            (listing_id, obs, new_price, r.get("in_stock"), run_id),
+                 SET price_inr = EXCLUDED.price_inr, in_stock = EXCLUDED.in_stock, source = EXCLUDED.source""",
+            (listing_id, obs, new_price, r.get("in_stock"), run_id, r.get("source")),
         )
         changed += 1
     return changed, unchanged

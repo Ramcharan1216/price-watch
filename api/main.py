@@ -18,7 +18,8 @@ from fastapi.staticfiles import StaticFiles
 from psycopg.rows import dict_row
 
 from .series import daily_series, product_series, window_stats
-from live.pipeline import LiveError, RateLimited, live_search
+from live.links import store_link
+from live.pipeline import LiveError, RateLimited, default_cap, default_timeout, live_search
 
 load_dotenv()
 app = FastAPI(title="Price Intel API", version="0.3")
@@ -40,7 +41,7 @@ def iso(x):
     return None if x is None else x.isoformat()
 
 
-LATEST = ("JOIN LATERAL (SELECT price_inr, observed_at FROM price_history h "
+LATEST = ("JOIN LATERAL (SELECT price_inr, observed_at, source FROM price_history h "
           "WHERE h.listing_id = l.id ORDER BY observed_at DESC LIMIT 1) cur ON true")
 
 
@@ -151,11 +152,12 @@ def product(product_id: int):
             raise HTTPException(404, "Product not found")
         offers = conn.execute(
             f"""SELECT s.slug AS store, s.name AS store_name, l.raw_title AS title, l.url,
-                       cur.price_inr AS price, l.last_checked
+                       cur.price_inr AS price, cur.source AS source, l.last_checked
                 FROM listings l JOIN stores s ON s.id = l.store_id {LATEST}
                 WHERE l.product_id = %s ORDER BY cur.price_inr, s.slug""", (product_id,)).fetchall()
     for o in offers:
         o["price"], o["last_checked"] = num(o["price"]), iso(o["last_checked"])
+        o["url"], o["link_kind"] = store_link(o["store"], o["title"], o["url"])   # demo links become store searches
     return {"product": p, "offers": offers, "cheapest": offers[0] if offers else None}
 
 
@@ -253,8 +255,7 @@ def live(request: Request, q: str = Query(..., min_length=3, max_length=60)):
     if not _live_rate_ok(ip):
         raise HTTPException(429, "You are searching too fast. Please wait a minute and try again.")
     try:
-        return live_search(q, daily_cap=int(os.environ.get("LIVE_DAILY_CAP", "200")),
-                           timeout=float(os.environ.get("LIVE_TIMEOUT", "5")))
+        return live_search(q, daily_cap=default_cap(), timeout=default_timeout())
     except RateLimited as e:
         raise HTTPException(429, str(e))
     except LiveError as e:

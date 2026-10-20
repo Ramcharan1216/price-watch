@@ -47,6 +47,7 @@ jobs:
           python tests/test_forecast.py
           python tests/test_reasons.py
           python tests/test_live_api.py
+          python tests/test_ai_web.py
           node --check web/app.js
 
       - name: Create the database tables
@@ -58,6 +59,7 @@ jobs:
         run: |
           python tests/test_loader.py
           python tests/test_live.py
+          python tests/test_refresh.py
 
       - name: Build the demo data, matching, forecast and reasons
         run: |
@@ -73,3 +75,4 @@ jobs:
 
       - name: API tests
         run: python tests/test_api.py
+

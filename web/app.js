@@ -1,5 +1,5 @@
 const app = document.getElementById("app");
-const inr = n => "???" + Math.round(n).toLocaleString("en-IN");
+const inr = n => "₹" + Math.round(n).toLocaleString("en-IN");
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const COLORS = ["var(--c1)", "var(--c2)", "var(--c3)"], DASH = ["", "7 4", "2 4"];
 
@@ -13,14 +13,18 @@ async function api(path) {
   return r.json();
 }
 
+/* ---------- links and badges ---------- */
+const linkHtml = o => o.url ? `<a href="${esc(o.url)}" target="_blank" rel="noopener"${o.link_kind === "search" ? ' title="Demo data: opens a search on the store"' : ""}>${o.link_kind === "search" ? "Search store" : "View"}</a>` : "<span></span>";
+const srcBadge = o => (o.source || o.origin) === "ai_web" ? '<span class="srcbadge">AI research</span>' : "";
+
 /* ---------- search page ---------- */
-const PRICE_STEPS = [[15000, "Under ???15,000"], [25000, "Under ???25,000"], [40000, "Under ???40,000"], [60000, "Under ???60,000"]];
+const PRICE_STEPS = [[15000, "Under ₹15,000"], [25000, "Under ₹25,000"], [40000, "Under ₹40,000"], [60000, "Under ₹60,000"]];
 const itemHtml = (p, sub) => `<li><a class="item" href="#/product/${p.id}"><span class="nm">${esc(p.name)}<span class="sub">${sub}</span></span><span class="px">${inr(p.lowest_price ?? p.current)}</span></a></li>`;
 
 function viewSearch() {
   app.innerHTML = `<section class="hero"><h1>What are you buying?</h1>
     <p>See the price in every store, and how it has moved.</p>
-    <input id="q" type="search" placeholder="Try ???galaxy s24??? or ???redmi note???" autocomplete="off" aria-label="Search phones">
+    <input id="q" type="search" placeholder="Try “galaxy s24” or “redmi note”" autocomplete="off" aria-label="Search phones">
     <div class="filters"><select id="fb" aria-label="Brand"><option value="">All brands</option></select>
       <select id="fp" aria-label="Price"><option value="">Any price</option>${PRICE_STEPS.map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select>
       <select id="fs" aria-label="Sort"><option value="name">A to Z</option><option value="price_asc">Cheapest first</option><option value="price_desc">Most expensive first</option></select></div>
@@ -56,7 +60,7 @@ function viewSearch() {
     $("livebtn").addEventListener("click", () => runLive(text));
   }
   async function runLive(text) {
-    livebox.innerHTML = `<p class="msg">Asking the stores for live prices???</p>`;
+    livebox.innerHTML = `<p class="msg">Researching live prices. This can take up to a minute…</p>`;
     try { const d = await api("/live-search?q=" + encodeURIComponent(text)); msg.textContent = ""; livebox.innerHTML = liveHtml(d); }
     catch (e) { livebox.innerHTML = `<p class="msg">${esc(e.message)}</p>`; }
   }
@@ -117,27 +121,27 @@ function drawChart(series, names) {
 }
 
 async function viewProduct(id) {
-  app.innerHTML = `<p class="msg">Loading???</p>`;
+  app.innerHTML = `<p class="msg">Loading…</p>`;
   let p, h, f, mv;
   try { [p, h, f, mv] = await Promise.all([api("/products/" + id), api("/products/" + id + "/history?days=90"),
     api("/products/" + id + "/forecast").catch(() => ({ available: false, reason: "The forecast is not available right now." })),
     api("/products/" + id + "/moves").catch(() => null)]); }
-  catch (e) { app.innerHTML = `<a class="back" href="#/">??? Back to search</a><p class="msg">${esc(e.message)}</p>`; return; }
+  catch (e) { app.innerHTML = `<a class="back" href="#/">← Back to search</a><p class="msg">${esc(e.message)}</p>`; return; }
   const prod = p.product, best = p.cheapest;
   const names = {}; p.offers.forEach(o => names[o.store] = o.store_name);
   const byStore = {};
   p.offers.forEach(o => (byStore[o.store] = byStore[o.store] || []).push(o));
   const rows = Object.values(byStore).map(l => ({ ...l[0], extra: l.length - 1 })).sort((a, b) => a.price - b.price);
-  const spec = [prod.ram_gb && prod.ram_gb + " GB RAM", prod.storage_gb && prod.storage_gb + " GB storage"].filter(Boolean).join(" ?? ");
-  app.innerHTML = `<a class="back" href="#/">??? Back to search</a>
+  const spec = [prod.ram_gb && prod.ram_gb + " GB RAM", prod.storage_gb && prod.storage_gb + " GB storage"].filter(Boolean).join(" · ");
+  app.innerHTML = `<a class="back" href="#/">← Back to search</a>
   <div class="top">
     <div class="tag"><h1>${esc(prod.brand)} ${esc(prod.model)}</h1><p class="spec">${esc(spec)}</p>
-      <div class="big">${best ? inr(best.price) : "???"}</div>
+      <div class="big">${best ? inr(best.price) : "—"}</div>
       <p class="where">${best ? "Cheapest now at " + esc(best.store_name) : "No prices yet"}</p>
       <p class="verdict">${esc(verdict(h))}</p></div>
     <div><h2>Prices today</h2><ul class="offers">${rows.map((o, i) => `<li class="offer ${i === 0 ? "best" : ""}">
-      <span><strong>${esc(o.store_name)}</strong>${i === 0 ? '<span class="best-label">Cheapest</span>' : ""}<span class="t">${esc(o.title)}</span>${o.extra ? `<span class="t">+${o.extra} more ${o.extra === 1 ? "listing" : "listings"} (other colors)</span>` : ""}</span>
-      <span class="px">${inr(o.price)}</span>${o.url ? `<a href="${esc(o.url)}" target="_blank" rel="noopener">View</a>` : "<span></span>"}</li>`).join("")}</ul></div>
+      <span><strong>${esc(o.store_name)}</strong>${srcBadge(o)}${i === 0 ? '<span class="best-label">Cheapest</span>' : ""}<span class="t">${esc(o.title)}</span>${o.extra ? `<span class="t">+${o.extra} more ${o.extra === 1 ? "listing" : "listings"} (other colors)</span>` : ""}</span>
+      <span class="px">${inr(o.price)}</span>${linkHtml(o)}</li>`).join("")}</ul>${rows.some(o => o.link_kind === "search") ? '<p class="note">Demo data: these links open a search on the store, because the prices are simulated.</p>' : ""}</div>
   </div>
   ${forecastHtml(f)}
   <section class="hist"><div class="bar"><h2>Price history</h2>
@@ -159,7 +163,7 @@ async function viewProduct(id) {
       const i = Math.max(0, Math.min(hist.series.length - 1, Math.round((x - c.L) / (c.W - c.L - c.R) * (hist.series.length - 1))));
       const d = hist.series[i], gx = c.L + (hist.series.length < 2 ? 0 : i / (hist.series.length - 1)) * (c.W - c.L - c.R);
       guide.setAttribute("x1", gx); guide.setAttribute("x2", gx); guide.setAttribute("visibility", "visible");
-      out.textContent = d.date + ":  " + c.slugs.filter(s => d.by_store[s] != null).map(s => (names[s] || s) + " " + inr(d.by_store[s])).join("  ??  ");
+      out.textContent = d.date + ":  " + c.slugs.filter(s => d.by_store[s] != null).map(s => (names[s] || s) + " " + inr(d.by_store[s])).join("  ·  ");
     }
     svg.addEventListener("mousemove", move); svg.addEventListener("touchmove", move);
   }
@@ -199,9 +203,9 @@ function forecastHtml(f) {
 }
 
 async function viewAccuracy() {
-  app.innerHTML = `<p class="msg">Loading???</p>`;
+  app.innerHTML = `<p class="msg">Loading…</p>`;
   let r; try { r = await api("/accuracy"); } catch (e) { r = { available: false }; }
-  const back = `<a class="back" href="#/">??? Back to search</a>`;
+  const back = `<a class="back" href="#/">← Back to search</a>`;
   if (!r.available) { app.innerHTML = back + `<h2>How accurate are we?</h2><p class="msg">No accuracy report yet.</p>`; return; }
   const rep = r.report, ks = Object.keys(rep.horizons).sort((a, b) => a - b);
   const row = k => { const x = rep.horizons[k]; return `<li class="arow"><strong>${k} days</strong>
@@ -231,7 +235,7 @@ function movesHtml(mv) {
     const up = m.direction === "up", when = m.kind === "gradual" ? niceDate(m.start) + " to " + niceDate(m.end) : niceDate(m.start);
     const why = m.reasons.length ? m.reasons.map(r => `<div class="why"><span class="chip c-${esc(r.confidence)}">${esc(r.label)}</span><span class="ev">${esc(r.evidence)}</span><span class="conf">${r.confidence === "strong" ? "Strong match" : r.confidence === "likely" ? "Likely" : "Possible"}</span></div>`).join("")
       : `<div class="why"><span class="chip c-none">No clear reason found</span></div>`;
-    return `<li class="mv"><div class="mh"><span class="mp ${up ? "up" : "down"}">${up ? "???" : "???"} ${Math.abs(m.change_pct).toFixed(1)}%</span>
+    return `<li class="mv"><div class="mh"><span class="mp ${up ? "up" : "down"}">${up ? "▲" : "▼"} ${Math.abs(m.change_pct).toFixed(1)}%</span>
       <span>${inr(m.start_price)} to ${inr(m.end_price)}<span class="sub">${m.kind === "gradual" ? "Gradual, " : ""}${esc(when)}</span></span></div>${why}</li>`;
   }).join("");
   return head + `<ul class="mlist">${items}</ul><p class="note">${esc(mv.note)}</p></section>`;
@@ -240,13 +244,18 @@ function movesHtml(mv) {
 
 /* ---------- live search results ---------- */
 function liveHtml(d) {
-  if (!d.groups.length) return `<p class="msg">No store returned prices for that. Check the spelling, or try a shorter name.</p>`;
+  const summary = d.summary ? `<p class="research">${esc(d.summary)}</p>` : "";
+  const sources = (d.sources || []).length ? `<p class="note">Sources: ${d.sources.map(s => `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title || s.url)}</a>`).join(", ")}</p>` : "";
+  const rows = (offers, plain) => offers.map((o, i) => `<li class="offer ${i === 0 && !plain ? "best" : ""}"><span><strong>${esc(o.store_name)}</strong>${srcBadge(o)}${i === 0 && !plain ? '<span class="best-label">Cheapest</span>' : ""}<span class="t">${esc(o.title)}</span></span>
+      <span class="px">${inr(o.price)}</span>${linkHtml(o)}</li>`).join("");
+  const unconfirmed = (d.unconfirmed || []).length ? `<li class="lg"><div class="lh"><strong>Not confirmed</strong><span class="badge warn">Check on the store</span></div>
+    <span class="sub">The research found these, but the price was not confirmed in the page text it quoted. They are not saved.</span><ul class="offers">${rows(d.unconfirmed, true)}</ul></li>` : "";
+  if (!d.groups.length && !unconfirmed) return summary + `<p class="msg">No store returned prices for that. Check the spelling, or try a shorter name.</p>` + sources;
   const groups = d.groups.map(g => `<li class="lg"><div class="lh"><strong>${esc(g.name)}</strong>
       <span class="badge ${g.verified ? "ok" : "warn"}">${g.verified ? "Matched" : "Unverified match"}</span></div>
     ${g.verified ? `<a class="lk" href="#/product/${g.product_id}">Open the full page</a>` : `<span class="sub">We could not confirm these listings are the same phone. Check the titles.</span>`}
-    <ul class="offers">${g.offers.map((o, i) => `<li class="offer ${i === 0 ? "best" : ""}"><span><strong>${esc(o.store_name)}</strong>${i === 0 ? '<span class="best-label">Cheapest</span>' : ""}<span class="t">${esc(o.title)}</span></span>
-      <span class="px">${inr(o.price)}</span>${o.url ? `<a href="${esc(o.url)}" target="_blank" rel="noopener">View</a>` : "<span></span>"}</li>`).join("")}</ul></li>`).join("");
-  return `<p class="note live-note">Live prices from ${esc(d.source)}${d.cached ? " (saved a few minutes ago)" : ""}. We have started tracking these phones, so their price history builds from today.</p><ul class="lgs">${groups}</ul>`;
+    <ul class="offers">${rows(g.offers, false)}</ul></li>`).join("");
+  return summary + `<p class="note live-note">Live prices from ${esc(d.source)}${d.cached ? " (saved a few minutes ago)" : ""}. We have started tracking the confirmed phones, so their price history builds from today.</p><ul class="lgs">${groups}${unconfirmed}</ul>${sources}`;
 }
 
 /* ---------- routing ---------- */
@@ -261,4 +270,3 @@ function route() {
 }
 window.addEventListener("hashchange", route);
 route();
-

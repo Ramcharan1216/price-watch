@@ -64,7 +64,7 @@ class FakeAdapter(BaseAdapter):
         if os.environ.get("FAKE_FAIL"):
             raise RuntimeError("simulated outage")
         tokens = _norm(query).split()
-        week = date.today().isocalendar()[1]
+        week = int(os.environ.get("FAKE_WEEK") or date.today().isocalendar()[1])   # FAKE_WEEK=30 pretends it is another week
         offers = []
         for brand, model, base, variants, colors in CATALOG:
             for i, (ram, sto) in enumerate(variants):

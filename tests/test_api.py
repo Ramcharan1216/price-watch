@@ -21,6 +21,13 @@ d = c.get(f"/products/{pid}").json()
 prices = [o["price"] for o in d["offers"]]
 assert d["offers"] and prices == sorted(prices), "offers should be sorted cheapest first"
 assert d["cheapest"]["price"] == min(prices)
+# links must never lead nowhere: demo URLs become a search on the store, real ones pass through
+for o in d["offers"]:
+    assert o["link_kind"] in ("listing", "search") and "example.com" not in o["url"], o
+    if o["link_kind"] == "search" and o["store"] == "amazon_in":
+        assert o["url"].startswith("https://www.amazon.in/s?k="), o["url"]
+    if o["link_kind"] == "search" and o["store"] == "flipkart":
+        assert o["url"].startswith("https://www.flipkart.com/search?q="), o["url"]
 
 h = c.get(f"/products/{pid}/history", params={"days": 30}).json()
 dates = [x["date"] for x in h["series"]]
