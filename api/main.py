@@ -19,7 +19,7 @@ from psycopg.rows import dict_row
 
 from .series import daily_series, product_series, window_stats
 from live.links import store_link
-from live.pipeline import LiveError, RateLimited, default_cap, default_timeout, live_search
+from live.pipeline import LiveError, RateLimited, default_cap, default_monthly_cap, default_timeout, live_search
 
 load_dotenv()
 app = FastAPI(title="Price Intel API", version="0.3")
@@ -196,8 +196,11 @@ def forecast(product_id: int):
             (product_id, product_id)).fetchall()
         rep = conn.execute("SELECT report FROM model_reports ORDER BY id DESC LIMIT 1").fetchone()
     if not rows:
-        return {"available": False, "reason": "Not enough price history yet. We need about four months "
-                                             "of recorded prices before we forecast."}
+        with db() as conn:
+            have = len(product_series(conn, product_id))
+        return {"available": False, "history_days": have, "needed_days": 120,
+                "reason": f"We have {have} {'day' if have == 1 else 'days'} of prices for this phone and need about 120 "
+                          "before we forecast. A forecast made from less would only be a guess."}
     tested = (rep["report"]["horizons"] if rep else {})
     return {"available": True, "made_on": iso(rows[0]["made_on"]), "current": num(rows[0]["current_price"]),
             "model_version": rows[0]["model_version"],
@@ -255,11 +258,22 @@ def live(request: Request, q: str = Query(..., min_length=3, max_length=60)):
     if not _live_rate_ok(ip):
         raise HTTPException(429, "You are searching too fast. Please wait a minute and try again.")
     try:
-        return live_search(q, daily_cap=default_cap(), timeout=default_timeout())
+        return live_search(q, daily_cap=default_cap(), timeout=default_timeout(), monthly_cap=default_monthly_cap())
     except RateLimited as e:
         raise HTTPException(429, str(e))
     except LiveError as e:
         raise HTTPException(503, str(e))
+
+
+@app.get("/status")
+def status():
+    """Is the data simulated or live, and how fresh? The site header shows this."""
+    with db() as conn:
+        demo = conn.execute("SELECT count(*) AS n FROM listings WHERE url LIKE 'https://example.com%'").fetchone()["n"]
+        live = conn.execute("SELECT count(*) AS n, max(last_checked) AS last FROM listings "
+                            "WHERE COALESCE(url, '') NOT LIKE 'https://example.com%'").fetchone()
+    mode = "empty" if not (demo or live["n"]) else "demo" if not live["n"] else "mixed" if demo else "live"
+    return {"mode": mode, "demo_listings": demo, "live_listings": live["n"], "last_live_check": iso(live["last"])}
 
 
 # ---- Website (Phase 4): http://127.0.0.1:8000/ opens the app ----

@@ -9,9 +9,10 @@ PLACEHOLDER = ("https://example.com",)
 
 
 def store_link(store, title, url):
-    """Returns (link, kind) where kind is 'listing' (a real page) or 'search' (a search on the store)."""
+    """Returns (link, kind) where kind is 'listing' (a store's page), 'aggregator' (a page listing every seller) or 'search' (a search on the store)."""
     if url and not url.startswith(PLACEHOLDER):
-        return url, "listing"
+        # a Google Shopping page lists every seller of the phone; it is not one store's own page
+        return url, ("aggregator" if url.startswith("https://www.google.com/search") else "listing")
     q = quote_plus((title or "")[:80])
     if store == "amazon_in":
         return f"https://www.amazon.in/s?k={q}", "search"

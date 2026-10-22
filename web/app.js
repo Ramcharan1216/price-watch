@@ -14,7 +14,16 @@ async function api(path) {
 }
 
 /* ---------- links and badges ---------- */
-const linkHtml = o => o.url ? `<a href="${esc(o.url)}" target="_blank" rel="noopener"${o.link_kind === "search" ? ' title="Demo data: opens a search on the store"' : ""}>${o.link_kind === "search" ? "Search store" : "View"}</a>` : "<span></span>";
+const LINKS = { search: ["Search store", "Demo data: opens a search on the store"], aggregator: ["See sellers", "Opens the Google Shopping page with every seller of this phone"] };
+const linkHtml = o => o.url ? `<a href="${esc(o.url)}" target="_blank" rel="noopener"${LINKS[o.link_kind] ? ` title="${LINKS[o.link_kind][1]}"` : ""}>${LINKS[o.link_kind] ? LINKS[o.link_kind][0] : "View"}</a>` : "<span></span>";
+const ago = iso => {
+  if (!iso) return "never";
+  const s = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (s < 90) return "just now";
+  if (s < 3600) return Math.round(s / 60) + " min ago";
+  if (s < 86400) return Math.round(s / 3600) + " h ago";
+  return Math.round(s / 86400) + (Math.round(s / 86400) === 1 ? " day ago" : " days ago");
+};
 const srcBadge = o => (o.source || o.origin) === "ai_web" ? '<span class="srcbadge">AI research</span>' : "";
 
 /* ---------- search page ---------- */
@@ -140,7 +149,7 @@ async function viewProduct(id) {
       <p class="where">${best ? "Cheapest now at " + esc(best.store_name) : "No prices yet"}</p>
       <p class="verdict">${esc(verdict(h))}</p></div>
     <div><h2>Prices today</h2><ul class="offers">${rows.map((o, i) => `<li class="offer ${i === 0 ? "best" : ""}">
-      <span><strong>${esc(o.store_name)}</strong>${srcBadge(o)}${i === 0 ? '<span class="best-label">Cheapest</span>' : ""}<span class="t">${esc(o.title)}</span>${o.extra ? `<span class="t">+${o.extra} more ${o.extra === 1 ? "listing" : "listings"} (other colors)</span>` : ""}</span>
+      <span><strong>${esc(o.store_name)}</strong>${srcBadge(o)}${i === 0 ? '<span class="best-label">Cheapest</span>' : ""}<span class="t">${esc(o.title)}</span><span class="t chk">Checked ${esc(ago(o.last_checked))}</span>${o.extra ? `<span class="t">+${o.extra} more ${o.extra === 1 ? "listing" : "listings"} (other colors)</span>` : ""}</span>
       <span class="px">${inr(o.price)}</span>${linkHtml(o)}</li>`).join("")}</ul>${rows.some(o => o.link_kind === "search") ? '<p class="note">Demo data: these links open a search on the store, because the prices are simulated.</p>' : ""}</div>
   </div>
   ${forecastHtml(f)}
@@ -257,6 +266,15 @@ function liveHtml(d) {
     <ul class="offers">${rows(g.offers, false)}</ul></li>`).join("");
   return summary + `<p class="note live-note">Live prices from ${esc(d.source)}${d.cached ? " (saved a few minutes ago)" : ""}. We have started tracking the confirmed phones, so their price history builds from today.</p><ul class="lgs">${groups}${unconfirmed}</ul>${sources}`;
 }
+
+/* ---------- data banner: simulated or live, and how fresh ---------- */
+fetch("/status").then(r => r.ok ? r.json() : null).then(s => {
+  const el = document.getElementById("banner");
+  if (!s || !el) return;
+  el.textContent = s.mode === "demo" ? "Demo data: prices are simulated"
+    : s.mode === "mixed" ? "Includes simulated demo data. Live prices updated " + ago(s.last_live_check)
+    : s.mode === "live" ? "Live prices. Updated " + ago(s.last_live_check) : "No prices loaded yet";
+}).catch(() => {});
 
 /* ---------- routing ---------- */
 function route() {

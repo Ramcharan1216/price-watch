@@ -32,12 +32,19 @@ def norm(text):
     return re.sub(r"\s+", " ", text).strip()
 
 
-def load_models(path):
+def load_models(path, conn=None):
+    """Known models from the CSV, plus (when a database connection is given) the models the
+    catalog job has discovered and approved. Their brands become recognisable too."""
     models = {}
     with open(path, newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
             models.setdefault(row["brand"], []).append(
                 (row["model"], norm(row["model"]).split()))
+    if conn is not None:
+        have = {(b, m) for b, ms in models.items() for m, _ in ms}
+        for brand, model in conn.execute("SELECT brand, model FROM catalog_models WHERE status = 'approved'").fetchall():
+            if (brand, model) not in have:
+                models.setdefault(brand, []).append((model, norm(model).split()))
     return models
 
 
@@ -72,17 +79,18 @@ def extract_specs(title):
     return ram, storage, cleaned
 
 
-def find_brand(tokens):
-    keys = list(BRAND_ALIASES)
+def find_brand(tokens, models=None):
+    aliases = {**BRAND_ALIASES, **{b.lower(): b for b in (models or {})}}    # discovered brands count too
+    keys = list(aliases)
     for tok in tokens[:6]:
-        if tok in BRAND_ALIASES:
-            return BRAND_ALIASES[tok], 0
+        if tok in aliases:
+            return aliases[tok], 0
         if len(tok) >= 4:
             # typo tolerance, but the word must be nearly the same length
             near = [k for k in keys if abs(len(k) - len(tok)) <= 2]
             hit = process.extractOne(tok, near, scorer=fuzz.ratio, score_cutoff=80) if near else None
             if hit:
-                return BRAND_ALIASES[hit[0]], 1
+                return aliases[hit[0]], 1
     return None, 0
 
 
@@ -109,7 +117,7 @@ def find_model(brand, tokens, models):
 def parse_title(title, models):
     ram, storage, cleaned = extract_specs(title)
     tokens = norm(cleaned).split()
-    brand, c1 = find_brand(tokens)
+    brand, c1 = find_brand(tokens, models)
     model, c2, model_tokens = find_model(brand, tokens, models) if brand else (None, 0, set())
     corrections = c1 + c2
     if model and {t for t in tokens if t not in model_tokens} & VARIANT_WORDS:

@@ -42,14 +42,22 @@ def normalize(q):
     return " ".join(re.findall(r"[a-z0-9+]+", q.lower()))
 
 
+def _source():
+    return os.environ.get("LIVE_SOURCE", "fake").lower()
+
+
 def default_cap():
-    """Daily limit on calls to the source. The AI source costs money per call, so it starts lower."""
-    fallback = "30" if os.environ.get("LIVE_SOURCE", "fake").lower() == "ai_web" else "200"
-    return int(os.environ.get("LIVE_DAILY_CAP", fallback))
+    """Daily limit on calls to the source. Paid sources start low."""
+    return int(os.environ.get("LIVE_DAILY_CAP", {"ai_web": "30", "serpapi": "20"}.get(_source(), "200")))
+
+
+def default_monthly_cap():
+    """Monthly limit on calls (0 = none). SerpApi starts at 100 so a free plan cannot be overspent."""
+    return int(os.environ.get("LIVE_MONTHLY_CAP", {"serpapi": "100"}.get(_source(), "0"))) or None
 
 
 def default_timeout():
-    return float(os.environ.get("LIVE_TIMEOUT", "90" if os.environ.get("LIVE_SOURCE", "fake").lower() == "ai_web" else "5"))
+    return float(os.environ.get("LIVE_TIMEOUT", {"ai_web": "90", "serpapi": "30"}.get(_source(), "5")))
 
 
 def _call(adapter, key, timeout):
@@ -67,10 +75,14 @@ def _call(adapter, key, timeout):
         ex.shutdown(wait=False)
 
 
-def _reserve_call(conn, cap):
+def _reserve_call(conn, cap, monthly_cap=None):
     row = conn.execute("SELECT calls FROM live_usage WHERE day = current_date").fetchone()
     if cap and row and row[0] >= cap:
         raise RateLimited("Today's live-search limit has been reached. Please try again tomorrow.")
+    if monthly_cap:
+        month = conn.execute("SELECT COALESCE(sum(calls), 0) FROM live_usage WHERE day >= date_trunc('month', current_date)").fetchone()[0]
+        if month >= monthly_cap:
+            raise RateLimited("This month's search allowance is used up. It resets at the start of next month.")
     conn.execute("INSERT INTO live_usage (day, calls) VALUES (current_date, 1) "
                  "ON CONFLICT (day) DO UPDATE SET calls = live_usage.calls + 1")
     conn.commit()
@@ -105,6 +117,7 @@ def _process(conn, data, source, models):
             skipped += 1
             continue
         link, kind = store_link(slug, title, o.get("url"))
+        kind = o.get("link_kind") or kind                      # a source may say its link is an aggregator page
         offer = {"store": slug, "store_name": o.get("store_name") or slug, "title": title, "price": price,
                  "url": link, "link_kind": kind, "origin": o.get("origin")}
         if o.get("confirmed", True) is False:        # shown to the user, never saved as history
@@ -134,6 +147,8 @@ def _process(conn, data, source, models):
                 gk = ("u", (p["brand"] or title.split()[0]).lower(), p["ram_gb"], p["storage_gb"])
             else:
                 gk = ("u", normalize(title))
+            if o.get("group"):                                  # the source says these are the same product
+                gk = ("u", o["group"])
             g = groups.setdefault(gk, {"product_id": None, "name": title, "verified": False, "offers": []})
         g["offers"].append(offer)
 
@@ -158,7 +173,7 @@ def _process(conn, data, source, models):
                     "the listings are the same phone, so check the titles."}
 
 
-def live_search(q, adapter=None, timeout=5.0, ttl=600, daily_cap=None, force=False, track=True):
+def live_search(q, adapter=None, timeout=5.0, ttl=600, daily_cap=None, force=False, track=True, monthly_cap=None):
     key = normalize(q)
     if len(key) < 3:
         raise ValueError("Search phrase too short")
@@ -173,9 +188,9 @@ def live_search(q, adapter=None, timeout=5.0, ttl=600, daily_cap=None, force=Fal
                     _track(conn, key)
                     conn.commit()
                 return {**hit[0], "query": key, "cached": True}
-        _reserve_call(conn, daily_cap)
+        _reserve_call(conn, daily_cap, monthly_cap)
         data = _call(adapter, key, timeout)
-        result = _process(conn, data, adapter.name, load_models(MODELS_PATH))
+        result = _process(conn, data, adapter.name, load_models(MODELS_PATH, conn))
         conn.execute("INSERT INTO live_cache (query_key, source, result) VALUES (%s, %s, %s) "
                      "ON CONFLICT (query_key) DO UPDATE SET fetched_at = now(), source = EXCLUDED.source, "
                      "result = EXCLUDED.result", (key, adapter.name, Jsonb(result)))
@@ -187,7 +202,7 @@ def live_search(q, adapter=None, timeout=5.0, ttl=600, daily_cap=None, force=Fal
         conn.close()
 
 
-def refresh_queries(limit=10, stale_minutes=60, max_age_days=30, pause=2.0, timeout=5.0, daily_cap=None, adapter=None):
+def refresh_queries(limit=10, stale_minutes=60, max_age_days=30, pause=2.0, timeout=5.0, daily_cap=None, adapter=None, monthly_cap=None):
     """Re-ask the source for searches people made recently, so prices keep changing.
     Most-searched first. Stops cleanly when today's quota is used up."""
     adapter = adapter or get_adapter()
@@ -204,7 +219,7 @@ def refresh_queries(limit=10, stale_minutes=60, max_age_days=30, pause=2.0, time
     stopped = None
     for i, key in enumerate(keys):
         try:
-            r = live_search(key, adapter=adapter, timeout=timeout, daily_cap=daily_cap, force=True, track=False)
+            r = live_search(key, adapter=adapter, timeout=timeout, daily_cap=daily_cap, force=True, track=False, monthly_cap=monthly_cap)
             changed += r["new_prices_stored"]
             done += 1
             c2 = psycopg.connect(os.environ["DATABASE_URL"])

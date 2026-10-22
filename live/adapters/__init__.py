@@ -7,6 +7,9 @@ def get_adapter(name=None):
     if name == "fake":
         from .fake import FakeAdapter
         return FakeAdapter()
+    if name == "serpapi":
+        from .serpapi_shopping import SerpApiAdapter
+        return SerpApiAdapter()
     if name == "ai_web":
         from .ai_web import AiWebAdapter
         return AiWebAdapter()
@@ -14,4 +17,4 @@ def get_adapter(name=None):
         from .template import TemplateAdapter
         return TemplateAdapter()
     # add your own here:  if name == "mysource": ...
-    raise ValueError(f"Unknown LIVE_SOURCE '{name}'. Known sources: fake, ai_web, template")
+    raise ValueError(f"Unknown LIVE_SOURCE '{name}'. Known sources: fake, serpapi, ai_web, template")

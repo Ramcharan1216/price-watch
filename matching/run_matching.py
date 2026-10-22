@@ -20,8 +20,8 @@ p.add_argument("--models", default="data/models.csv")
 p.add_argument("--redo", action="store_true")
 a = p.parse_args()
 
-models = load_models(a.models)
 conn = connect()
+models = load_models(a.models, conn)       # includes phones the catalog job discovered and approved
 where = "match_status <> 'manual'" if a.redo else "match_status = 'unmatched'"
 listings = conn.execute(f"SELECT id, raw_title FROM listings WHERE {where}").fetchall()
 

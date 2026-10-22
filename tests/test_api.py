@@ -34,6 +34,8 @@ dates = [x["date"] for x in h["series"]]
 assert dates == sorted(dates) and 0 < len(dates) <= 30
 assert h["current_lowest"] == h["series"][-1]["lowest"]
 assert h["stats"]["last_30_days"]["low"] <= h["stats"]["last_30_days"]["high"]
+st = c.get("/status").json()
+assert st["mode"] in ("demo", "mixed", "live") and st["demo_listings"] + st["live_listings"] > 0, st
 assert c.get("/products/999999999").status_code == 404
 assert c.get("/products/999999999/history").status_code == 404
 print(f"PASS: API works. Example: {d['product']['name']} | cheapest {d['cheapest']['price']} "
